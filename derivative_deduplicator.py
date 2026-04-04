@@ -16,7 +16,7 @@ from pathlib import Path
 import exifread
 from tqdm import tqdm
 
-from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files, write_paths_for_lightroom, SMB_WORKERS
+from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files, write_paths_for_lightroom, update_progress, SMB_WORKERS
 
 CSV_PATH = "derivatives.csv"
 
@@ -71,6 +71,7 @@ def process_file_metadata(f: Path):
 
 def map_derivatives(files: list):
     print(f"\nExtracting EXIF data from {len(files):,} files...")
+    update_progress(f"Reading EXIF data from {len(files):,} files")
     
     # Store EXIF groups
     exif_map = defaultdict(list)
@@ -96,6 +97,7 @@ def map_derivatives(files: list):
                 no_exif_count += 1
 
     print(f"\nGrouped {len(files) - no_exif_count:,} files via EXIF. Skipped {no_exif_count:,} without timestamps.")
+    update_progress("Analyzing EXIF groups for derivatives")
     
     records = []
     
@@ -168,6 +170,7 @@ def print_report(records: list, scanned_size: int, elapsed: float) -> list:
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--catalog', help=argparse.SUPPRESS)  # handled by utils.py
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--delete_from_filesystem', action='store_true', help='Delete derivatives from the filesystem')
     group.add_argument('--delete_in_lightroom', action='store_true', help='Write paths for the Lightroom plugin to remove from catalog + disk')

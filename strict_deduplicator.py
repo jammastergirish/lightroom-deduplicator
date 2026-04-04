@@ -42,7 +42,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files, write_paths_for_lightroom, SMB_WORKERS
+from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files, write_paths_for_lightroom, update_progress, SMB_WORKERS
 
 _DUP_RE = re.compile(r'^(?P<stem>.+)[- ](?P<n>\d+)(?P<ext>\.[^.]+)$', re.IGNORECASE)
 
@@ -81,7 +81,8 @@ def fmt_time(t: float) -> str:
 def hash_all(files: list) -> list:
     total = len(files)
     print(f"\nProcessing {total:,} file(s) for potential duplicates ...")
-    
+    update_progress(f"Step 1/3: Grouping {total:,} files by size")
+
     # Step 1: Group by file size
     size_groups = defaultdict(list)
     
@@ -125,6 +126,7 @@ def hash_all(files: list) -> list:
 
     # Step 2: Partial hash (first 1MB) for files sharing a size
     print(f"\nFound {len(files_to_phash):,} files with duplicate sizes. Checking headers (1MB)...")
+    update_progress(f"Step 2/3: Partial-hashing {len(files_to_phash):,} size-matched files")
     phash_groups = defaultdict(list)
     
     def _do_phash(f):
@@ -161,6 +163,7 @@ def hash_all(files: list) -> list:
     # Step 3: Full hash only for files with identical sizes AND headers
     if files_to_full_hash:
         print(f"\nFound {len(files_to_full_hash):,} strictly similar files. Performing full hash...")
+        update_progress(f"Step 3/3: Full-hashing {len(files_to_full_hash):,} header-matched files")
         
         def _do_fhash(f):
             try:
@@ -255,6 +258,7 @@ def print_report(records: list, scanned_size: int, elapsed: float) -> list:
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--catalog', help=argparse.SUPPRESS)  # handled by utils.py
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--delete_from_filesystem', action='store_true', help='Delete duplicates from the filesystem')
     group.add_argument('--delete_in_lightroom', action='store_true', help='Write paths for the Lightroom plugin to remove from catalog + disk')

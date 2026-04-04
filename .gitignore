@@ -1,2 +1,7 @@
 strict.csv
 derivatives.csv
+deleted_paths.txt
+.dedup_output.txt
+.dedup_progress.txt
+.dedup_summary.txt
+__pycache__/
