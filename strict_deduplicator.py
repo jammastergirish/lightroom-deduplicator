@@ -82,7 +82,7 @@ def fmt_time(t: float) -> str:
 
 def hash_all(files: list) -> list:
     total = len(files)
-    print(f"\nProcessing {total} file(s) for potential duplicates ...")
+    print(f"\nProcessing {total:,} file(s) for potential duplicates ...")
     
     # Step 1: Group by file size
     size_groups = defaultdict(list)
@@ -116,7 +116,7 @@ def hash_all(files: list) -> list:
         return records
 
     # Step 2: Partial hash (first 1MB) for files sharing a size
-    print(f"\nFound {len(files_to_phash)} files with duplicate sizes. Checking headers (1MB)...")
+    print(f"\nFound {len(files_to_phash):,} files with duplicate sizes. Checking headers (1MB)...")
     phash_groups = defaultdict(list)
     
     def _do_phash(f):
@@ -152,7 +152,7 @@ def hash_all(files: list) -> list:
 
     # Step 3: Full hash only for files with identical sizes AND headers
     if files_to_full_hash:
-        print(f"\nFound {len(files_to_full_hash)} strictly similar files. Performing full hash...")
+        print(f"\nFound {len(files_to_full_hash):,} strictly similar files. Performing full hash...")
         
         def _do_fhash(f):
             try:
@@ -257,7 +257,7 @@ def main():
     if not files:
         print("No photo files found. Check FOLDERS in the script.")
         sys.exit(0)
-    print(f"Found {len(files)} photo file(s) across {len(FOLDERS)} folder(s).")
+    print(f"Found {len(files):,} photo file(s) across {len(FOLDERS):,} folder(s).")
 
     records = hash_all(files)
     records = select_keepers(records)

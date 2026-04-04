@@ -70,7 +70,7 @@ def process_file_metadata(f: Path):
 
 
 def map_derivatives(files: list):
-    print(f"\nExtracting EXIF data from {len(files)} files...")
+    print(f"\nExtracting EXIF data from {len(files):,} files...")
     
     # Store EXIF groups
     exif_map = defaultdict(list)
@@ -95,7 +95,7 @@ def map_derivatives(files: list):
             else:
                 no_exif_count += 1
 
-    print(f"\nGrouped {len(files) - no_exif_count} files via EXIF. Skipped {no_exif_count} without timestamps.")
+    print(f"\nGrouped {len(files) - no_exif_count:,} files via EXIF. Skipped {no_exif_count:,} without timestamps.")
     
     records = []
     
@@ -178,7 +178,7 @@ def main():
     if not files:
         print("No photo files found. Check FOLDERS in the script.")
         sys.exit(0)
-    print(f"Found {len(files)} photo file(s) across {len(FOLDERS)} folder(s).")
+    print(f"Found {len(files):,} photo file(s) across {len(FOLDERS):,} folder(s).")
 
     records = map_derivatives(files)
 

@@ -38,7 +38,7 @@ def collect_files() -> list:
         # rglob yields continuously. By removing sorted(), we unblock the scan!
         for f in p.rglob('*'):
             scanned_items += 1
-            if scanned_items % 5000 == 0:
+            if scanned_items % 100 == 0:
                 # Carriage return (\r) overwrites the same line for a clean animation
                 print(f"      Scanned {scanned_items:,} items...", end="\r", flush=True)
                 
@@ -61,8 +61,8 @@ def fmt_bytes(n: float) -> str:
 
 def print_summary(count: int, label: str, recoverable: int, scanned: int, elapsed: float) -> None:
     print(f"{'='*70}")
-    print(f"  {count} {label} flagged for deletion  ({fmt_bytes(recoverable)} recoverable)")
-    print(f"  Scanned {fmt_bytes(scanned)} in {elapsed:.1f} seconds")
+    print(f"  {count:,} {label} flagged for deletion  ({fmt_bytes(recoverable)} recoverable)")
+    print(f"  Scanned {fmt_bytes(scanned)} in {elapsed:,.1f} seconds")
     print(f"{'='*70}")
 
 
