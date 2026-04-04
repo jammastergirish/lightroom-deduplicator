@@ -14,7 +14,8 @@ local Helpers = {}
 
 Helpers.scriptDir = LrPathUtils.parent(_PLUGIN.path)
 Helpers.catalogPath = LrApplication.activeCatalog():getPath()
-Helpers.pathsFile = LrPathUtils.child(Helpers.scriptDir, "deleted_paths.txt")
+Helpers.pathsFile = LrPathUtils.child(Helpers.scriptDir, "to_delete_in_catalog.txt")
+Helpers.diskDeleteFile = LrPathUtils.child(Helpers.scriptDir, "to_delete_from_disk.txt")
 Helpers.outputFile = LrPathUtils.child(Helpers.scriptDir, ".dedup_output.txt")
 Helpers.progressFile = LrPathUtils.child(Helpers.scriptDir, ".dedup_progress.txt")
 Helpers.summaryFile = LrPathUtils.child(Helpers.scriptDir, ".dedup_summary.txt")
@@ -134,19 +135,33 @@ function Helpers.removeFromCatalog()
         return
     end
 
-    local detail = matched .. " photo(s) will be removed from the catalog."
-    if unmatched > 0 then
-        detail = detail .. "\n" .. unmatched .. " path(s) were not found in the catalog (already removed or not imported)."
+    -- Read not-in-catalog files that need disk deletion
+    local diskPaths = {}
+    local df = io.open(Helpers.diskDeleteFile, "r")
+    if df then
+        for line in df:lines() do
+            local trimmed = line:match("^%s*(.-)%s*$")
+            if trimmed and #trimmed > 0 then
+                diskPaths[#diskPaths + 1] = trimmed
+            end
+        end
+        df:close()
+    end
+
+    local detail = matched .. " photo(s) will be flagged as Rejected in the catalog."
+    if #diskPaths > 0 then
+        detail = detail .. "\n" .. #diskPaths .. " file(s) not in catalog will be moved to Trash."
     end
 
     local confirm = LrDialogs.confirm(
-        "Flag " .. matched .. " duplicate(s) as Rejected?",
-        detail .. "\n\nPhotos will be flagged as Rejected. After that, use\nPhoto → Delete Rejected Photos to remove them from the catalog.",
-        "Flag as Rejected",
+        "Process " .. (matched + #diskPaths) .. " duplicate(s)?",
+        detail .. "\n\nCatalog photos will be flagged as Rejected. After that, use\nPhoto → Delete Rejected Photos to remove them from the catalog.",
+        "Proceed",
         "Cancel"
     )
     if confirm ~= "ok" then return end
 
+    -- Flag catalog photos as Rejected
     local rejected = 0
     catalog:withWriteAccessDo("Flag duplicates as rejected", function()
         for _, photo in ipairs(photosToRemove) do
@@ -155,16 +170,31 @@ function Helpers.removeFromCatalog()
         end
     end)
 
+    -- Delete not-in-catalog files and move needs-import files via Python
+    local diskDeleted = #diskPaths
+    local pyArgs = {}
+    if diskDeleted > 0 then pyArgs[#pyArgs + 1] = "--delete-from-disk" end
+    pyArgs[#pyArgs + 1] = "--move-needs-import"
+
+    local cmd = '/bin/zsh -l -c "'
+        .. "export PATH=/Users/girish/.local/bin:$PATH"
+        .. " && cd " .. Helpers.scriptDir
+        .. " && uv run utils.py " .. table.concat(pyArgs, " ")
+        .. '"'
+    LrTasks.execute(cmd)
+
+    -- Clear the catalog paths file
     local fOut = io.open(Helpers.pathsFile, "w")
     if fOut then fOut:close() end
 
-    LrDialogs.message(
-        "Done",
-        "Flagged " .. rejected .. " photo(s) as Rejected.\n\n"
-            .. "To finish removal, go to:\n"
-            .. "Photo → Delete Rejected Photos",
-        "info"
-    )
+    local msg = "Flagged " .. rejected .. " photo(s) as Rejected."
+    if diskDeleted > 0 then
+        msg = msg .. "\nMoved " .. diskDeleted .. " file(s) to Trash (not in catalog)."
+    end
+    msg = msg .. "\n\nTo finish removal, go to:\nPhoto → Delete Rejected Photos"
+    msg = msg .. "\n\nIf any keepers were not in your catalog, they have been\nmoved to the to_import/ folder for easy import."
+
+    LrDialogs.message("Done", msg, "info")
 end
 
 return Helpers

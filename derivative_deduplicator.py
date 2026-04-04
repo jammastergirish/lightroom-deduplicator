@@ -3,6 +3,7 @@
 # dependencies = [
 #     "tqdm",
 #     "exifread",
+#     "send2trash",
 # ]
 # ///
 import argparse
@@ -16,7 +17,7 @@ from pathlib import Path
 import exifread
 from tqdm import tqdm
 
-from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files, write_paths_for_lightroom, update_progress, SMB_WORKERS
+from utils import FOLDERS, collect_files, fmt_bytes, print_summary, write_paths_for_lightroom, update_progress, SMB_WORKERS, get_catalog_paths, write_import_paths
 
 CSV_PATH = "derivatives.csv"
 
@@ -69,49 +70,50 @@ def process_file_metadata(f: Path):
     return f, size, dt, model
 
 
-def map_derivatives(files: list):
+def map_derivatives(files: list, catalog_paths: set[str]):
     print(f"\nExtracting EXIF data from {len(files):,} files...")
     update_progress(f"Reading EXIF data from {len(files):,} files")
-    
+
     # Store EXIF groups
     exif_map = defaultdict(list)
     no_exif_count = 0
-    
+
     with ThreadPoolExecutor(max_workers=SMB_WORKERS) as executor:
         futures = {executor.submit(process_file_metadata, f): f for f in files}
         for future in tqdm(as_completed(futures), total=len(futures), desc="Reading EXIF", unit="file", dynamic_ncols=True):
             res = future.result()
             if not res:
                 continue
-                
+
             f, size, dt, model = res
-            
+
             if dt:
                 # Group strictly by Time AND Model to prevent coincidences
                 exif_map[(dt, model)].append({
                     'path': f,
                     'size': size,
-                    'tier': get_tier(f.suffix)
+                    'tier': get_tier(f.suffix),
+                    'in_catalog': str(f) in catalog_paths,
                 })
             else:
                 no_exif_count += 1
 
     print(f"\nGrouped {len(files) - no_exif_count:,} files via EXIF. Skipped {no_exif_count:,} without timestamps.")
     update_progress("Analyzing EXIF groups for derivatives")
-    
+
     records = []
-    
+
     # Analyze the groups
     for (dt, model), group in exif_map.items():
         if len(group) < 2:
             continue
-            
-        # Sort group by: 1. Tier (lowest number is best), 2. File size (largest is best) 
-        group.sort(key=lambda r: (r['tier'], -r['size']))
-        
+
+        # Sort group by: 1. Tier (lowest number is best), 2. Prefer in-catalog, 3. File size (largest is best)
+        group.sort(key=lambda r: (r['tier'], not r['in_catalog'], -r['size']))
+
         keeper = group[0]
         best_tier = keeper['tier']
-        
+
         for r in group:
             # Protect all files that are in the highest discovered tier.
             # This ensures we don't accidentally delete "Original" vs "Edited" JPGs that share an EXIF time.
@@ -122,11 +124,11 @@ def map_derivatives(files: list):
                 # Only cull if it's explicitly a lower-quality derivative format
                 r['to_delete'] = True
                 r['keeper_path'] = keeper['path']
-                
+
             r['exif_time'] = dt
             r['model'] = model
             records.append(r)
-            
+
     return records
 
 
@@ -171,9 +173,7 @@ def print_report(records: list, scanned_size: int, elapsed: float) -> list:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--catalog', help=argparse.SUPPRESS)  # handled by utils.py
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--delete_from_filesystem', action='store_true', help='Delete derivatives from the filesystem')
-    group.add_argument('--delete_in_lightroom', action='store_true', help='Write paths for the Lightroom plugin to remove from catalog + disk')
+    parser.add_argument('--delete', action='store_true', help='Write paths for the Lightroom plugin to act on')
     args = parser.parse_args()
 
     t0 = time.time()
@@ -185,7 +185,11 @@ def main():
         sys.exit(0)
     print(f"Found {len(files):,} photo file(s) across {len(FOLDERS):,} folder(s).")
 
-    records = map_derivatives(files)
+    print("Loading Lightroom catalog for keeper selection...")
+    catalog_paths = get_catalog_paths()
+    print(f"  {len(catalog_paths):,} file(s) tracked in catalog.")
+
+    records = map_derivatives(files, catalog_paths)
 
     if not records:
         print("\nNo overlapping EXIF sequences found.")
@@ -199,12 +203,16 @@ def main():
     if not to_delete:
         sys.exit(0)
 
-    if args.delete_in_lightroom:
-        write_paths_for_lightroom(to_delete)
-    elif args.delete_from_filesystem:
-        delete_files(to_delete)
+    # Keepers that aren't in the catalog need to be imported
+    keeper_paths = {str(r['keeper_path']) for r in to_delete}
+    needs_import = sorted(p for p in keeper_paths if p not in catalog_paths)
+    if needs_import:
+        write_import_paths(needs_import)
+
+    if args.delete:
+        write_paths_for_lightroom(to_delete, catalog_paths)
     else:
-        print("[DRY RUN] Re-run with --delete_from_filesystem or --delete_in_lightroom to act on the files listed above.")
+        print("[DRY RUN] Re-run with --delete to act on the files listed above.")
         sys.exit(0)
 
 

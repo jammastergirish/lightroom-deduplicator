@@ -2,16 +2,16 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "tqdm",
+#     "send2trash",
 # ]
 # ///
 """
 strict_deduplicator.py  —  Lightroom Strict Bit-for-Bit Deduplicator
 ----------------------------------------------------------------------
-Edit FOLDERS in utils.py, then run with:
+Typically invoked by the Lightroom plugin. Can also be run directly:
 
-    uv run strict_deduplicator.py                          # dry run — reports what would be deleted
-    uv run strict_deduplicator.py --delete_from_filesystem # delete from filesystem
-    uv run strict_deduplicator.py --delete_in_lightroom    # write paths for the Lightroom plugin
+    uv run strict_deduplicator.py           # dry run — reports what would be deleted
+    uv run strict_deduplicator.py --delete  # write paths for the Lightroom plugin to act on
 """
 
 # ---------------------------------------------------------------------------
@@ -42,14 +42,20 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files, write_paths_for_lightroom, update_progress, SMB_WORKERS
+from utils import FOLDERS, collect_files, fmt_bytes, print_summary, write_paths_for_lightroom, update_progress, SMB_WORKERS, get_catalog_paths, write_import_paths
 
 _DUP_RE = re.compile(r'^(?P<stem>.+)[- ](?P<n>\d+)(?P<ext>\.[^.]+)$', re.IGNORECASE)
+_DESCRIPTIVE_RE = re.compile(r'^(Screenshot|Screen Recording|Screencast)', re.IGNORECASE)
 
 
 def is_dup_pattern(name: str) -> bool:
     m = _DUP_RE.match(name)
     return bool(m) and int(m.group('n')) <= MAX_SUFFIX
+
+
+def is_descriptive_name(name: str) -> bool:
+    """Return True for human-readable names like 'Screenshot 2024-...'."""
+    return bool(_DESCRIPTIVE_RE.match(name))
 
 
 def birthtime(path: Path) -> float:
@@ -191,14 +197,17 @@ def hash_all(files: list) -> list:
     return records
 
 
-def select_keepers(records: list) -> list:
+def select_keepers(records: list, catalog_paths: set[str]) -> list:
     """
     Within each hash group, pick the keeper:
-      1. Prefer non-dup-pattern names over dup-pattern names.
-      2. Tiebreak: oldest birthtime (first imported).
+      1. Prefer files that are in the Lightroom catalog.
+      2. Prefer descriptive names (Screenshot, etc.) over generic ones.
+      3. Prefer non-dup-pattern names over dup-pattern names.
+      4. Tiebreak: oldest birthtime (first imported).
     """
     for r in records:
         r['is_dup_pattern'] = is_dup_pattern(r['path'].name)
+        r['in_catalog'] = str(r['path']) in catalog_paths
 
     by_hash = defaultdict(list)
     for r in records:
@@ -208,7 +217,12 @@ def select_keepers(records: list) -> list:
         if len(group) == 1:
             group[0].update(to_delete=False, keeper_path=group[0]['path'])
             continue
-        ranked = sorted(group, key=lambda r: (r['is_dup_pattern'], r['birthtime']))
+        ranked = sorted(group, key=lambda r: (
+            not r['in_catalog'],
+            r['is_dup_pattern'],
+            not is_descriptive_name(r['path'].name),
+            r['birthtime'],
+        ))
         keeper = ranked[0]
         for r in group:
             r['to_delete'] = (r is not keeper)
@@ -259,9 +273,7 @@ def print_report(records: list, scanned_size: int, elapsed: float) -> list:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--catalog', help=argparse.SUPPRESS)  # handled by utils.py
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--delete_from_filesystem', action='store_true', help='Delete duplicates from the filesystem')
-    group.add_argument('--delete_in_lightroom', action='store_true', help='Write paths for the Lightroom plugin to remove from catalog + disk')
+    parser.add_argument('--delete', action='store_true', help='Write paths for the Lightroom plugin to act on')
     args = parser.parse_args()
 
     t0 = time.time()
@@ -273,8 +285,12 @@ def main():
         sys.exit(0)
     print(f"Found {len(files):,} photo file(s) across {len(FOLDERS):,} folder(s).")
 
+    print("Loading Lightroom catalog for keeper selection...")
+    catalog_paths = get_catalog_paths()
+    print(f"  {len(catalog_paths):,} file(s) tracked in catalog.")
+
     records = hash_all(files)
-    records = select_keepers(records)
+    records = select_keepers(records, catalog_paths)
     write_csv(records, csv_path)
     scanned_size = sum(r.get('size', 0) for r in records)
     elapsed = time.time() - t0
@@ -283,12 +299,16 @@ def main():
     if not to_delete:
         sys.exit(0)
 
-    if args.delete_in_lightroom:
-        write_paths_for_lightroom(to_delete)
-    elif args.delete_from_filesystem:
-        delete_files(to_delete)
+    # Keepers that aren't in the catalog need to be imported
+    keeper_paths = {str(r['keeper_path']) for r in to_delete}
+    needs_import = sorted(p for p in keeper_paths if p not in catalog_paths)
+    if needs_import:
+        write_import_paths(needs_import)
+
+    if args.delete:
+        write_paths_for_lightroom(to_delete, catalog_paths)
     else:
-        print("[DRY RUN] Re-run with --delete_from_filesystem or --delete_in_lightroom to act on the files listed above.")
+        print("[DRY RUN] Re-run with --delete to act on the files listed above.")
         sys.exit(0)
 
 
