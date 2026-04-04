@@ -1,5 +1,9 @@
 # Lightroom Deduplicator
 
+<img width="267" height="376" alt="Untitled 3" src="https://github.com/user-attachments/assets/04dcd546-73a2-4c03-9001-9970ac11a3a9" />
+<img width="270" height="348" alt="Untitled 2" src="https://github.com/user-attachments/assets/750aa613-c218-47b8-b15e-bc0b7d4122b3" />
+<img width="274" height="265" alt="Untitled" src="https://github.com/user-attachments/assets/49bdac91-c101-4790-ac11-3275bf0b778f" />
+
 Blazing-fast, multi-threaded Python scripts that clean up your Lightroom photo library. They blast through local and network drives (SMB/NAS) in parallel, safely culling both **exact duplicate clones** and **lower-quality derivatives**.
 
 ## How it Works
