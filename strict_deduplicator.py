@@ -17,7 +17,7 @@ After deletion, in Lightroom:
 """
 
 # ---------------------------------------------------------------------------
-# CONFIG — edit these before running (folders live in utils.py)
+# CONFIG — edit these before running
 # ---------------------------------------------------------------------------
 
 # Only match numeric suffixes up to this value as "duplicate imports".
