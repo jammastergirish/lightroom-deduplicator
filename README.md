@@ -36,3 +36,9 @@ Both scripts query the catalog (read-only, via SQLite `?mode=ro` — never modif
 3. **Photo** → **Delete Rejected Photos** to finish removing flagged photos.
 4. Import the `to_import/` folder if any keepers weren't already in the catalog.
 5. Repeat with **Library** → **Plug-in Extras** → **Remove Derivative Duplicates**.
+
+<img width="267" height="376" alt="Untitled 3" src="https://github.com/user-attachments/assets/04dcd546-73a2-4c03-9001-9970ac11a3a9" />
+
+<img width="270" height="348" alt="Untitled 2" src="https://github.com/user-attachments/assets/750aa613-c218-47b8-b15e-bc0b7d4122b3" />
+
+<img width="274" height="265" alt="Untitled" src="https://github.com/user-attachments/assets/49bdac91-c101-4790-ac11-3275bf0b778f" />
