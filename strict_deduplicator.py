@@ -36,6 +36,7 @@ import csv
 import hashlib
 import re
 import sys
+import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -43,7 +44,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from utils import FOLDERS, collect_files, fmt_bytes, delete_files
+from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files
 
 _DUP_RE = re.compile(r'^(?P<stem>.+)[- ](?P<n>\d+)(?P<ext>\.[^.]+)$', re.IGNORECASE)
 
@@ -218,7 +219,7 @@ def write_csv(records: list, csv_path: Path) -> None:
     print(f"CSV written → {csv_path}\n")
 
 
-def print_report(records: list) -> list:
+def print_report(records: list, scanned_size: int, elapsed: float) -> list:
     to_delete = [r for r in records if r.get('to_delete')]
     if not to_delete:
         print("No duplicates found. Library is clean!")
@@ -239,9 +240,7 @@ def print_report(records: list) -> list:
         print(f"  → saves {fmt_bytes(group_size)}  |  running total: {fmt_bytes(running)}\n")
 
     total_size = sum(r['size'] for r in to_delete)
-    print(f"{'='*70}")
-    print(f"  {len(to_delete)} file(s) flagged for deletion  ({fmt_bytes(total_size)} recoverable)")
-    print(f"{'='*70}")
+    print_summary(len(to_delete), "file(s)", total_size, scanned_size, elapsed)
 
     return to_delete
 
@@ -251,6 +250,7 @@ def main():
     parser.add_argument('--delete', action='store_true', help='Actually delete (default: dry run)')
     args = parser.parse_args()
 
+    t0 = time.time()
     csv_path = (Path(__file__).parent / CSV_PATH).resolve()
 
     files = collect_files()
@@ -262,7 +262,9 @@ def main():
     records = hash_all(files)
     records = select_keepers(records)
     write_csv(records, csv_path)
-    to_delete = print_report(records)
+    scanned_size = sum(r.get('size', 0) for r in records)
+    elapsed = time.time() - t0
+    to_delete = print_report(records, scanned_size, elapsed)
 
     if not to_delete:
         sys.exit(0)
