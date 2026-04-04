@@ -31,8 +31,8 @@ FOLDERS = [
 ]
 
 # Only match numeric suffixes up to this value as "duplicate imports".
-# Keeps 99 so IMG_1234-2.JPG is caught but holiday-2024.jpg is not.
-MAX_SUFFIX = 99
+# Keeps 10 so IMG_1234-2.JPG is caught but holiday-2024.jpg is not.
+MAX_SUFFIX = 10
 
 # Where to write the audit CSV.
 CSV_PATH = "lr_dedup.csv"
@@ -47,6 +47,7 @@ import hashlib
 import re
 import sys
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -155,12 +156,21 @@ def hash_all(files: list) -> list:
     # Step 2: Partial hash (first 1MB) for files sharing a size
     print(f"\nFound {len(files_to_phash)} files with duplicate sizes. Checking headers (1MB)...")
     phash_groups = defaultdict(list)
-    for f in tqdm(files_to_phash, desc="Partial hashing", unit="file", dynamic_ncols=True):
+    
+    def _do_phash(f):
         try:
-            size = f.stat().st_size
-            phash_groups[(size, sha256_partial(f))].append(f)
+            return f, f.stat().st_size, sha256_partial(f), None
         except OSError as e:
-            tqdm.write(f"[WARN] Skipping {f}: {e}", file=sys.stderr)
+            return f, None, None, e
+
+    with ThreadPoolExecutor() as executor:
+        futures = {executor.submit(_do_phash, f): f for f in files_to_phash}
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Partial hashing", unit="file", dynamic_ncols=True):
+            f, size, phash, err = future.result()
+            if err:
+                tqdm.write(f"[WARN] Skipping {f}: {err}", file=sys.stderr)
+            else:
+                phash_groups[(size, phash)].append(f)
 
     files_to_full_hash = []
     for (size, phash), group in phash_groups.items():
@@ -181,16 +191,26 @@ def hash_all(files: list) -> list:
     # Step 3: Full hash only for files with identical sizes AND headers
     if files_to_full_hash:
         print(f"\nFound {len(files_to_full_hash)} strictly similar files. Performing full hash...")
-        for f in tqdm(files_to_full_hash, desc="Rigorous full-hash", unit="file", dynamic_ncols=True):
+        
+        def _do_fhash(f):
             try:
-                records.append({
-                    'path': f,
-                    'sha256': sha256_full(f),
-                    'birthtime': birthtime(f),
-                    'size': f.stat().st_size,
-                })
+                return f, f.stat().st_size, sha256_full(f), birthtime(f), None
             except OSError as e:
-                tqdm.write(f"[WARN] Skipping {f}: {e}", file=sys.stderr)
+                return f, None, None, None, e
+
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(_do_fhash, f): f for f in files_to_full_hash}
+            for future in tqdm(as_completed(futures), total=len(futures), desc="Rigorous full-hash", unit="file", dynamic_ncols=True):
+                f, size, fhash, btime, err = future.result()
+                if err:
+                    tqdm.write(f"[WARN] Skipping {f}: {err}", file=sys.stderr)
+                else:
+                    records.append({
+                        'path': f,
+                        'sha256': fhash,
+                        'birthtime': btime,
+                        'size': size,
+                    })
     else:
         print("\nAll remaining files were unique after header check!")
         

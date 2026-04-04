@@ -4,11 +4,11 @@ A Python script designed to find and delete bit-for-bit exact duplicate photos a
 
 ## How it Works
 
-Instead of naively relying on filenames or EXIF metadata, this script guarantees safety by verifying exact file matches with hashes. To overcome the slowness of hashing large files, it utilizes a multi-stage pipeline:
+Instead of naively relying on filenames or EXIF metadata, this script guarantees safety by verifying exact file matches with hashes. To overcome the typical slowness of hashing gigabytes of large photos, it leverages a parallelized, multi-threaded process to fully saturate your SSD's read speeds alongside a multi-stage elimination pipeline:
 
 1. **Size Grouping:** It rapidly scans all target files and groups them by exact byte-ratio. Any file with a completely unique size is instantly bypassed (as it cannot therefore be an exact duplicate).
-2. **Partial Hashing:** For files that happen to share an exact size, it generates a quick SHA-256 hash of *just* the first 1MB.
-3. **Full-Hash:** Only files that perfectly match both their byte size *and* their first-megabyte signature undergo a rigorous full-file SHA-256 hash check.
+2. **Concurrent Partial Hashing:** For files that happen to share an exact size, it spawns an efficient thread pool (scaled automatically to your CPU cores) to process files concurrently, generating a quick SHA-256 hash of *just* the first 1MB of each file.
+3. **Concurrent Full-Hash:** Only files that perfectly match both their byte size *and* their first-megabyte signature are pushed into the final parallel queue to undergo a full-file SHA-256 hash check, preventing your storage drive from ever sitting idle.
 4. **Keeper Selection:** When a true bit-for-bit duplicate cluster is confirmed, the script protects the oldest file (based on birthtime). It also inherently prefers clean, base filenames, actively targeting Lightroom-generated duplicate patterns like `IMG_1234-2.JPG` or `FILE_NAME 1.MOV`.
 
 ## Usage
