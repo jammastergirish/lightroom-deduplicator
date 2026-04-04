@@ -19,30 +19,50 @@ Once the exact clones are gone, this script hunts for lower-quality exported der
 
 Before running, ensure you have correctly configured the `FOLDERS` array at the top of `utils.py` with all absolute or `~` based directory paths you wish to traverse.
 
-### 1. Execute the Strict Pass
-First, clear out the exact clones to remove the dead weight:
+There are two deletion workflows. Choose one:
 
+### Option A: Delete via Lightroom Plugin (recommended)
+
+This approach uses a bundled Lightroom plugin to remove duplicates from both the catalog and the filesystem in one step. No ghost references to clean up.
+
+**One-time setup:** In Lightroom Classic, go to **File** → **Plug-in Manager** → **Add** and select the `RemoveFromCatalog.lrplugin` folder.
+
+**Step 1 — Scan and review:**
 ```bash
-uv run strict_deduplicator.py
-uv run strict_deduplicator.py --delete
+uv run strict_deduplicator.py          # dry run — review strict.csv
+uv run derivative_deduplicator.py      # dry run — review derivatives.csv
 ```
-*(Review `strict.csv` before running with `--delete`)*
 
-### 2. Execute the Derivative Pass
-Second, sweep for multi-format derivatives (like orphaned JPGs):
-
+**Step 2 — Mark for deletion:**
 ```bash
-uv run derivative_deduplicator.py
-uv run derivative_deduplicator.py --delete
+uv run strict_deduplicator.py --delete_in_lightroom
+uv run derivative_deduplicator.py --delete_in_lightroom
 ```
-*(Review `derivatives.csv` before running with `--delete`)*
+Both scripts append to the same `deleted_paths.txt`, so you can run both before opening Lightroom.
 
-### 3. Lightroom Catalog Cleanup
-Because these scripts eliminate duplicates directly from the filesystem, Lightroom will still retain ghost references to the deleted copies in its active catalog. You must scrub the catalog to align it with your filesystem:
+**Step 3 — Remove in Lightroom:**
+1. In Lightroom, go to **Library** → **Plug-in Extras** → **Remove Deleted Duplicates from Catalog**.
+2. Confirm the removal when prompted. The plugin clears `deleted_paths.txt` after a successful run.
 
+### Option B: Delete from filesystem only
+
+This deletes duplicate files directly from disk. Lightroom will still show ghost references to the deleted files, which you must clean up manually.
+
+**Step 1 — Scan and review:**
+```bash
+uv run strict_deduplicator.py          # dry run — review strict.csv
+uv run derivative_deduplicator.py      # dry run — review derivatives.csv
+```
+
+**Step 2 — Delete:**
+```bash
+uv run strict_deduplicator.py --delete_from_filesystem
+uv run derivative_deduplicator.py --delete_from_filesystem
+```
+
+**Step 3 — Clean up Lightroom catalog:**
 1. Open Lightroom Classic.
-2. In the top toolbar, go to **Library** → **Find All Missing Photos**
-3. Select all the photos in the resulting grid view (e.g. `Cmd + A` on Mac).
-4. Hit the `Delete` key (or `Right Click` → **Remove from Catalog**) to purge the ghosts.
+2. Go to **Library** → **Find All Missing Photos**.
+3. Select all (`Cmd + A`) → **Delete** → **Remove from Catalog**.
 
-You should perform this "Find All Missing Photos" check *before* you run the scripts. This allows you to identify and deal with any photos that were already missing from your filesystem.
+Tip: Run "Find All Missing Photos" *before* the scripts too, to deal with any pre-existing missing photos first.

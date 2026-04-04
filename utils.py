@@ -109,6 +109,19 @@ def print_summary(count: int, label: str, recoverable: int, scanned: int, elapse
     print(f"{'='*70}")
 
 
+DELETED_PATHS_FILE = Path(__file__).parent / "deleted_paths.txt"
+
+
+def write_paths_for_lightroom(to_delete: list) -> None:
+    """Write paths to deleted_paths.txt for the Lightroom plugin to consume."""
+    paths = [str(r['path']) for r in to_delete]
+    # Append so both scripts can accumulate into one list across runs
+    with open(DELETED_PATHS_FILE, 'a', encoding='utf-8') as f:
+        f.write('\n'.join(paths) + '\n')
+    print(f"\n{len(paths):,} path(s) appended to {DELETED_PATHS_FILE}")
+    print("In Lightroom: Library → Plug-in Extras → Remove Deleted Duplicates from Catalog")
+
+
 def delete_files(to_delete: list) -> None:
     print(f"{'!'*70}")
     print(f"  About to permanently delete {len(to_delete)} file(s).")

@@ -16,7 +16,7 @@ from pathlib import Path
 import exifread
 from tqdm import tqdm
 
-from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files, SMB_WORKERS
+from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files, write_paths_for_lightroom, SMB_WORKERS
 
 CSV_PATH = "derivatives.csv"
 
@@ -168,7 +168,9 @@ def print_report(records: list, scanned_size: int, elapsed: float) -> list:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--delete', action='store_true', help='Actually delete (default: dry run)')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--delete_from_filesystem', action='store_true', help='Delete derivatives from the filesystem')
+    group.add_argument('--delete_in_lightroom', action='store_true', help='Write paths for the Lightroom plugin to remove from catalog + disk')
     args = parser.parse_args()
 
     t0 = time.time()
@@ -194,11 +196,13 @@ def main():
     if not to_delete:
         sys.exit(0)
 
-    if not args.delete:
-        print("[DRY RUN] Re-run with --delete to remove the files listed above.")
+    if args.delete_in_lightroom:
+        write_paths_for_lightroom(to_delete)
+    elif args.delete_from_filesystem:
+        delete_files(to_delete)
+    else:
+        print("[DRY RUN] Re-run with --delete_from_filesystem or --delete_in_lightroom to act on the files listed above.")
         sys.exit(0)
-
-    delete_files(to_delete)
 
 
 if __name__ == '__main__':
