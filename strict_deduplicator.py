@@ -45,7 +45,7 @@ from tqdm import tqdm
 
 from utils import FOLDERS, collect_files, fmt_bytes, delete_files
 
-_DUP_RE = re.compile(r'^(?P<stem>.+)-(?P<n>\d+)(?P<ext>\.[^.]+)$', re.IGNORECASE)
+_DUP_RE = re.compile(r'^(?P<stem>.+)[- ](?P<n>\d+)(?P<ext>\.[^.]+)$', re.IGNORECASE)
 
 
 def is_dup_pattern(name: str) -> bool:
