@@ -5,12 +5,12 @@
 # ]
 # ///
 """
-lr_dedup.py  —  Lightroom Deduplicator
+strict_deduplicator.py  —  Lightroom Strict Bit-for-Bit Deduplicator
 ----------------------------------------------------------------------
 Edit FOLDERS below, then run with:
 
-    uv run lr_dedup.py              # dry run — reports what would be deleted
-    uv run lr_dedup.py --delete     # actually deletes after confirmation
+    uv run strict_deduplicator.py              # dry run — reports what would be deleted
+    uv run strict_deduplicator.py --delete     # actually deletes after confirmation
 
 After deletion, in Lightroom:
   Library menu → Find All Missing Photos → select all → Remove from Catalog
@@ -35,7 +35,7 @@ FOLDERS = [
 MAX_SUFFIX = 10
 
 # Where to write the audit CSV.
-CSV_PATH = "lr_dedup.csv"
+CSV_PATH = "strict.csv"
 
 # ---------------------------------------------------------------------------
 # (no edits needed below this line)
