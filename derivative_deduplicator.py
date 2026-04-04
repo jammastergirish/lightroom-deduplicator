@@ -16,7 +16,7 @@ from pathlib import Path
 import exifread
 from tqdm import tqdm
 
-from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files
+from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files, SMB_WORKERS
 
 CSV_PATH = "derivatives.csv"
 
@@ -76,7 +76,7 @@ def map_derivatives(files: list):
     exif_map = defaultdict(list)
     no_exif_count = 0
     
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=SMB_WORKERS) as executor:
         futures = {executor.submit(process_file_metadata, f): f for f in files}
         for future in tqdm(as_completed(futures), total=len(futures), desc="Reading EXIF", unit="file", dynamic_ncols=True):
             res = future.result()

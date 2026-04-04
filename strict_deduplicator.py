@@ -44,7 +44,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files
+from utils import FOLDERS, collect_files, fmt_bytes, print_summary, delete_files, SMB_WORKERS
 
 _DUP_RE = re.compile(r'^(?P<stem>.+)[- ](?P<n>\d+)(?P<ext>\.[^.]+)$', re.IGNORECASE)
 
@@ -86,11 +86,21 @@ def hash_all(files: list) -> list:
     
     # Step 1: Group by file size
     size_groups = defaultdict(list)
-    for f in tqdm(files, desc="Grouping by size", unit="file", dynamic_ncols=True):
+    
+    def _get_size(f: Path):
         try:
-            size_groups[f.stat().st_size].append(f)
+            return f, f.stat().st_size, None
         except OSError as e:
-            tqdm.write(f"[WARN] Skipping {f}: {e}", file=sys.stderr)
+            return f, None, e
+
+    with ThreadPoolExecutor(max_workers=SMB_WORKERS) as executor:
+        futures = {executor.submit(_get_size, f): f for f in files}
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Grouping by size", unit="file", dynamic_ncols=True):
+            f, size, err = future.result()
+            if err:
+                tqdm.write(f"[WARN] Skipping {f}: {err}", file=sys.stderr)
+            else:
+                size_groups[size].append(f)
 
     records = []
     files_to_phash = []
@@ -125,7 +135,7 @@ def hash_all(files: list) -> list:
         except OSError as e:
             return f, None, None, e
 
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=SMB_WORKERS) as executor:
         futures = {executor.submit(_do_phash, f): f for f in files_to_phash}
         for future in tqdm(as_completed(futures), total=len(futures), desc="Partial hashing", unit="file", dynamic_ncols=True):
             f, size, phash, err = future.result()
@@ -160,7 +170,7 @@ def hash_all(files: list) -> list:
             except OSError as e:
                 return f, None, None, None, e
 
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=SMB_WORKERS) as executor:
             futures = {executor.submit(_do_fhash, f): f for f in files_to_full_hash}
             for future in tqdm(as_completed(futures), total=len(futures), desc="Rigorous full-hash", unit="file", dynamic_ncols=True):
                 f, size, fhash, btime, err = future.result()
