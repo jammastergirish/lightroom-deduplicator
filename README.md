@@ -14,7 +14,7 @@ Once the exact clones are gone, this script hunts for lower-quality exported der
 
 ## Usage
 
-Before running, ensure you have correctly configured the `FOLDERS` array at the top of both scripts with all the absolute or `~` based directory paths you wish to traverse.
+Before running, ensure you have correctly configured the `FOLDERS` array at the top of `utils.py` with all absolute or `~` based directory paths you wish to traverse.
 
 ### 1. Execute the Strict Pass
 First, clear out the exact clones to remove the dead weight:

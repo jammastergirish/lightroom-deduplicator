@@ -7,7 +7,7 @@
 """
 strict_deduplicator.py  —  Lightroom Strict Bit-for-Bit Deduplicator
 ----------------------------------------------------------------------
-Edit FOLDERS below, then run with:
+Edit FOLDERS in utils.py, then run with:
 
     uv run strict_deduplicator.py              # dry run — reports what would be deleted
     uv run strict_deduplicator.py --delete     # actually deletes after confirmation
@@ -17,18 +17,8 @@ After deletion, in Lightroom:
 """
 
 # ---------------------------------------------------------------------------
-# CONFIG — edit these before running
+# CONFIG — edit these before running (folders live in utils.py)
 # ---------------------------------------------------------------------------
-
-FOLDERS = [
-    "~/Pictures/2026",
-    "~/Pictures/2",
-    "~/Pictures/3",
-    "~/Pictures/1904",
-    "~/Pictures/2023",
-    "~/Pictures/2025",
-    "~/FILES/Photos"
-]
 
 # Only match numeric suffixes up to this value as "duplicate imports".
 # Keeps 10 so IMG_1234-2.JPG is caught but holiday-2024.jpg is not.
@@ -53,15 +43,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-
-PHOTO_EXTENSIONS = {
-    '.jpg', '.jpeg',
-    '.heic', '.heif',
-    '.cr3', '.cr2',
-    '.nef', '.arw', '.orf', '.rw2', '.raf', '.dng',
-    '.png', '.tif', '.tiff',
-    '.mov', '.mp4',
-}
+from utils import FOLDERS, collect_files, fmt_bytes, delete_files
 
 _DUP_RE = re.compile(r'^(?P<stem>.+)-(?P<n>\d+)(?P<ext>\.[^.]+)$', re.IGNORECASE)
 
@@ -93,29 +75,8 @@ def sha256_partial(path: Path, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
-def fmt_bytes(n: float) -> str:
-    for unit in ('B', 'KB', 'MB', 'GB'):
-        if n < 1024:
-            return f"{n:.1f} {unit}"
-        n /= 1024
-    return f"{n:.1f} TB"
-
-
 def fmt_time(t: float) -> str:
     return datetime.fromtimestamp(t).strftime('%Y-%m-%d %H:%M:%S')
-
-
-def collect_files() -> list:
-    files = []
-    for folder in FOLDERS:
-        p = Path(folder).expanduser().resolve()
-        if not p.is_dir():
-            print(f"[WARN] Not a directory, skipping: {p}", file=sys.stderr)
-            continue
-        for f in sorted(p.rglob('*')):
-            if f.is_file() and f.suffix.lower() in PHOTO_EXTENSIONS:
-                files.append(f)
-    return files
 
 
 def hash_all(files: list) -> list:
@@ -283,30 +244,6 @@ def print_report(records: list) -> list:
     print(f"{'='*70}")
 
     return to_delete
-
-
-def delete_files(to_delete: list) -> None:
-    print(f"{'!'*70}")
-    print(f"  About to permanently delete {len(to_delete)} file(s).")
-    print(f"  Review the CSV and the report above before continuing.")
-    print(f"{'!'*70}")
-    if input("\n  Type  YES  to proceed: ").strip() != 'YES':
-        print("Aborted. Nothing deleted.")
-        sys.exit(0)
-
-    deleted = failed = 0
-    for r in to_delete:
-        try:
-            r['path'].unlink()
-            print(f"  OK  {r['path']}")
-            deleted += 1
-        except OSError as e:
-            print(f"  ERR {r['path']}  ({e})", file=sys.stderr)
-            failed += 1
-
-    print(f"\nDeleted {deleted}  |  Failed {failed}")
-    if deleted:
-        print("\nIn Lightroom: Library → Find All Missing Photos → select all → Remove from Catalog")
 
 
 def main():
