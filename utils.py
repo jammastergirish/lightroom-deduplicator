@@ -49,8 +49,6 @@ def get_catalog_path() -> str:
 
 
 FOLDERS = get_folders_from_catalog(get_catalog_path())
-FOLDERS.remove("/Volumes/FILES/Photos")
-print(FOLDERS)
 
 PHOTO_EXTENSIONS = {
     '.jpg', '.jpeg',

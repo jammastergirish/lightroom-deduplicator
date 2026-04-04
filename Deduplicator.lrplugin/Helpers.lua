@@ -39,7 +39,7 @@ function Helpers.shellRunWithProgress(cmd, progressTitle)
     -- Run the command in a background async task
     LrTasks.startAsyncTask(function()
         local fullCmd = '/bin/zsh -l -c "'
-            .. "export PATH=/Users/girish/.local/bin:$PATH"
+            .. "export PATH=$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
             .. " && cd " .. Helpers.scriptDir
             .. " && " .. cmd .. " --catalog \\\"" .. Helpers.catalogPath .. "\\\""
             .. " > " .. Helpers.outputFile .. " 2>&1"
@@ -177,7 +177,7 @@ function Helpers.removeFromCatalog()
     pyArgs[#pyArgs + 1] = "--move-needs-import"
 
     local cmd = '/bin/zsh -l -c "'
-        .. "export PATH=/Users/girish/.local/bin:$PATH"
+        .. "export PATH=$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
         .. " && cd " .. Helpers.scriptDir
         .. " && uv run utils.py " .. table.concat(pyArgs, " ")
         .. '"'

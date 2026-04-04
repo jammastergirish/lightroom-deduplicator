@@ -29,13 +29,15 @@ Once the exact clones are gone, this script hunts for lower-quality exported der
 
 ## Setup
 
-In Lightroom Classic, go to **File** → **Plug-in Manager** → **Add** and select the `Deduplicator.lrplugin` folder.
+1. Install [uv](https://docs.astral.sh/uv/) (the Python package runner): `curl -LsSf https://astral.sh/uv/install.sh | sh`
+2. Set `CATALOG_PATH` at the top of `utils.py` to point to your Lightroom catalog (`.lrcat` file).
+3. In Lightroom Classic, go to **File** → **Plug-in Manager** → **Add** and select the `Deduplicator.lrplugin` folder.
 
 ## Usage
 
 Everything happens from within Lightroom. The plugin scans your library, shows a confirmation dialog, and then:
 - **In-catalog duplicates** are flagged as Rejected — you finish by using Photo → Delete Rejected Photos.
-- **Not-in-catalog duplicates** (files on disk that were never imported) are deleted from disk directly after you confirm.
+- **Not-in-catalog duplicates** (files on disk that were never imported) are moved to Trash after you confirm.
 
 **Whenever you want to deduplicate:**
 1. Go to **Library** → **Plug-in Extras** → **Remove Strict Duplicates**.
