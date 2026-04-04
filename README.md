@@ -5,7 +5,7 @@ A pair of **blazing-fast, multi-threaded** Python scripts engineered to clean up
 ## How it Works
 
 ### Phase 0: Parallel Network Crawling
-To prevent the script from silently hanging when exploring high-latency Network Attached Storage (like an SMB or NAS drive), both scripts share a specialized file collector. It unleashes dozens of concurrent threads to explore subdirectories in parallel, aggressively bypassing network lockstep latency. It also provides a live-streaming terminal readout so you aren't left waiting blindly. *(Note: The thread count is configurable via `SMB_WORKERS` in `utils.py`)*
+To prevent the script from silently hanging when exploring high-latency Network Attached Storage (like an SMB or NAS drive), both scripts share a specialized file collector. It unleashes dozens of concurrent threads to explore subdirectories in parallel, aggressively bypassing network lockstep latency. *(Note: The thread count is configurable via `SMB_WORKERS` in `utils.py`)*
 
 ### Phase 1: `strict_deduplicator.py`
 Instead of naively relying on filenames or EXIF metadata, this script eliminates files only if they are **100% bit-for-bit identical**. To overcome the typical slowness of hashing gigabytes of large photos, it leverages a parallelized, multi-threaded process to fully saturate your disks' read speeds alongside a multi-stage elimination pipeline (Size Grouping → Concurrent Partial Hashing → Concurrent Full-Hash).
