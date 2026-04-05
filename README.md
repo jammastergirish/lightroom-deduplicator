@@ -14,7 +14,10 @@ Eliminates files that are **100% bit-for-bit identical** using a multi-stage pip
 Hunts for lower-quality exports (e.g. a `.JPG` from a `.CR3`) by grouping files with matching EXIF `DateTimeOriginal` timestamps and camera model. Enforces a preservation hierarchy (`RAW` > `Lossless` > `HEIC` > `JPEG`) and flags the lower-tier file. Multiple files within the same tier are protected to preserve edited variants.
 
 ### Lightroom catalog awareness
-Both scripts query the catalog (read-only, via SQLite `?mode=ro` — never modified) to prefer in-catalog files as keepers. If a keeper isn't in the catalog, it's moved to `to_import/` for easy import after cleanup.
+Both scripts query the catalog (read-only, via SQLite `?mode=ro` — never modified) to decide what to keep. In-catalog files are always preferred as keepers. For files found on the filesystem but **not** in the catalog:
+
+- **Has a matching duplicate already in the catalog** → safely trashed (the catalog copy is the keeper).
+- **No matching duplicate in the catalog** (i.e. it's unique/the keeper) → moved to `to_import/` so you can import it into Lightroom after cleanup.
 
 ## Safety
 
