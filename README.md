@@ -11,7 +11,7 @@ Both scripts share a multi-threaded file collector that explores subdirectories 
 Eliminates files that are **100% bit-for-bit identical** using a multi-stage pipeline: Size Grouping → Concurrent Partial Hashing (first 1 MB) → Concurrent Full-Hash. Fully saturates disk read speeds.
 
 ### Phase 2: `derivative_deduplicator.py`
-Hunts for lower-quality exports (e.g. a `.JPG` from a `.CR3`) by grouping files with matching EXIF `DateTimeOriginal` timestamps and camera model. Enforces a preservation hierarchy (`RAW` > `Lossless` > `HEIC` > `JPEG`) and flags the lower-tier file. Multiple files within the same tier are protected to preserve edited variants.
+Hunts for lower-quality exports (e.g. a `.JPG` from a `.CR3`) by grouping files with matching EXIF `DateTimeOriginal` timestamps and camera model. Enforces a preservation hierarchy (`RAW` > `Lossless` > `HEIC` > `JPEG`) and flags the lower-tier file for deletion.
 
 ### Keeper selection
 
@@ -29,7 +29,9 @@ When multiple files are candidates for deletion, each script picks the **keeper*
 2. In the Lightroom catalog (preferred over not-in-catalog)
 3. Largest file size
 
-All files sharing the best tier are always protected — so an original and edited JPEG from the same burst are never both flagged.
+Additional protections:
+- All files sharing the best tier are always kept — so an original and edited JPEG from the same burst are never both flagged.
+- **Curated files are never deleted.** If a lower-tier derivative has been starred, captioned, or has a creator set, it is kept alongside its higher-tier original. These pairs are written to `curated_derivatives_to_review.txt` for manual review.
 
 ### Lightroom catalog awareness
 Both scripts query the catalog (read-only, via SQLite `?mode=ro` — never modified) to decide what to keep. In-catalog files are always preferred as keepers. For files found on the filesystem but **not** in the catalog:

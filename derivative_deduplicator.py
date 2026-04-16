@@ -17,7 +17,7 @@ from pathlib import Path
 import exifread
 from tqdm import tqdm
 
-from utils import FOLDERS, collect_files, fmt_bytes, print_summary, write_paths_for_lightroom, update_progress, SMB_WORKERS, get_catalog_paths, write_import_paths
+from utils import FOLDERS, collect_files, fmt_bytes, print_summary, write_paths_for_lightroom, update_progress, SMB_WORKERS, get_catalog_paths, get_catalog_curated, write_import_paths
 
 CSV_PATH = "derivatives.csv"
 
@@ -70,7 +70,10 @@ def process_file_metadata(f: Path):
     return f, size, dt, model
 
 
-def map_derivatives(files: list, catalog_paths: set[str]):
+REVIEW_FILE = Path(__file__).parent / "curated_derivatives_to_review.txt"
+
+
+def map_derivatives(files: list, catalog_paths: set[str], curated_paths: set[str]):
     print(f"\nExtracting EXIF data from {len(files):,} files...")
     update_progress(f"Reading EXIF data from {len(files):,} files")
 
@@ -94,6 +97,7 @@ def map_derivatives(files: list, catalog_paths: set[str]):
                     'size': size,
                     'tier': get_tier(f.suffix),
                     'in_catalog': str(f) in catalog_paths,
+                    'is_curated': str(f) in curated_paths,
                 })
             else:
                 no_exif_count += 1
@@ -102,6 +106,7 @@ def map_derivatives(files: list, catalog_paths: set[str]):
     update_progress("Analyzing EXIF groups for derivatives")
 
     records = []
+    review_pairs = []
 
     # Analyze the groups
     for (dt, model), group in exif_map.items():
@@ -120,6 +125,11 @@ def map_derivatives(files: list, catalog_paths: set[str]):
             if r['tier'] == best_tier:
                 r['to_delete'] = False
                 r['keeper_path'] = keeper['path']
+            elif r['is_curated']:
+                # Never delete a curated file — flag it for manual review instead
+                r['to_delete'] = False
+                r['keeper_path'] = keeper['path']
+                review_pairs.append((keeper['path'], r['path']))
             else:
                 # Only cull if it's explicitly a lower-quality derivative format
                 r['to_delete'] = True
@@ -128,6 +138,15 @@ def map_derivatives(files: list, catalog_paths: set[str]):
             r['exif_time'] = dt
             r['model'] = model
             records.append(r)
+
+    if review_pairs:
+        with open(REVIEW_FILE, 'w', encoding='utf-8') as f:
+            f.write("# Curated derivatives kept alongside their RAW/higher-tier originals.\n")
+            f.write("# Review these pairs — you may want to consolidate.\n\n")
+            for keeper, curated in sorted(review_pairs, key=lambda p: str(p[0])):
+                f.write(f"ORIGINAL  {keeper}\n")
+                f.write(f"CURATED   {curated}\n\n")
+        print(f"{len(review_pairs):,} curated derivative(s) protected — see {REVIEW_FILE}")
 
     return records
 
@@ -187,9 +206,10 @@ def main():
 
     print("Loading Lightroom catalog for keeper selection...")
     catalog_paths = get_catalog_paths()
+    curated_paths = get_catalog_curated()
     print(f"  {len(catalog_paths):,} file(s) tracked in catalog.")
 
-    records = map_derivatives(files, catalog_paths)
+    records = map_derivatives(files, catalog_paths, curated_paths)
 
     if not records:
         print("\nNo overlapping EXIF sequences found.")
