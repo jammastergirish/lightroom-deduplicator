@@ -13,6 +13,23 @@ Eliminates files that are **100% bit-for-bit identical** using a multi-stage pip
 ### Phase 2: `derivative_deduplicator.py`
 Hunts for lower-quality exports (e.g. a `.JPG` from a `.CR3`) by grouping files with matching EXIF `DateTimeOriginal` timestamps and camera model. Enforces a preservation hierarchy (`RAW` > `Lossless` > `HEIC` > `JPEG`) and flags the lower-tier file. Multiple files within the same tier are protected to preserve edited variants.
 
+### Keeper selection
+
+When multiple files are candidates for deletion, each script picks the **keeper** using a strict priority order (first criterion wins):
+
+**Strict deduplicator** (bit-identical groups):
+1. In the Lightroom catalog (preferred over not-in-catalog)
+2. Non-duplicate-pattern filename (`IMG_1234.JPG` over `IMG_1234-2.JPG`)
+3. Descriptive filename (`Screenshot …`, `Screen Recording …`) over generic names
+4. Oldest creation date (earliest imported/created file wins the tie)
+
+**Derivative deduplicator** (same EXIF timestamp + camera model):
+1. Best format tier: RAW (.CR3, .DNG, …) > Lossless (.TIFF, .PNG) > HEIC > JPEG
+2. In the Lightroom catalog (preferred over not-in-catalog)
+3. Largest file size
+
+All files sharing the best tier are always protected — so an original and edited JPEG from the same burst are never both flagged.
+
 ### Lightroom catalog awareness
 Both scripts query the catalog (read-only, via SQLite `?mode=ro` — never modified) to decide what to keep. In-catalog files are always preferred as keepers. For files found on the filesystem but **not** in the catalog:
 
