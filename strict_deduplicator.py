@@ -42,7 +42,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from utils import FOLDERS, collect_files, fmt_bytes, print_summary, write_paths_for_lightroom, update_progress, SMB_WORKERS, get_catalog_paths, write_import_paths
+from utils import FOLDERS, collect_files, fmt_bytes, print_summary, write_paths_for_lightroom, update_progress, SMB_WORKERS, get_catalog_paths, get_catalog_curated, write_import_paths
 
 _DUP_RE = re.compile(r'^(?P<stem>.+)[- ](?P<n>\d+)(?P<ext>\.[^.]+)$', re.IGNORECASE)
 _DESCRIPTIVE_RE = re.compile(r'^(Screenshot|Screen Recording|Screencast)', re.IGNORECASE)
@@ -197,17 +197,19 @@ def hash_all(files: list) -> list:
     return records
 
 
-def select_keepers(records: list, catalog_paths: set[str]) -> list:
+def select_keepers(records: list, catalog_paths: set[str], curated_paths: set[str]) -> list:
     """
     Within each hash group, pick the keeper:
       1. Prefer files that are in the Lightroom catalog.
-      2. Prefer descriptive names (Screenshot, etc.) over generic ones.
+      2. Prefer curated files (starred, captioned, or has creator).
       3. Prefer non-dup-pattern names over dup-pattern names.
-      4. Tiebreak: oldest birthtime (first imported).
+      4. Prefer descriptive names (Screenshot, etc.) over generic ones.
+      5. Tiebreak: oldest birthtime (first imported).
     """
     for r in records:
         r['is_dup_pattern'] = is_dup_pattern(r['path'].name)
         r['in_catalog'] = str(r['path']) in catalog_paths
+        r['is_curated'] = str(r['path']) in curated_paths
 
     by_hash = defaultdict(list)
     for r in records:
@@ -219,6 +221,7 @@ def select_keepers(records: list, catalog_paths: set[str]) -> list:
             continue
         ranked = sorted(group, key=lambda r: (
             not r['in_catalog'],
+            not r['is_curated'],
             r['is_dup_pattern'],
             not is_descriptive_name(r['path'].name),
             r['birthtime'],
@@ -287,10 +290,11 @@ def main():
 
     print("Loading Lightroom catalog for keeper selection...")
     catalog_paths = get_catalog_paths()
+    curated_paths = get_catalog_curated()
     print(f"  {len(catalog_paths):,} file(s) tracked in catalog.")
 
     records = hash_all(files)
-    records = select_keepers(records, catalog_paths)
+    records = select_keepers(records, catalog_paths, curated_paths)
     write_csv(records, csv_path)
     scanned_size = sum(r.get('size', 0) for r in records)
     elapsed = time.time() - t0

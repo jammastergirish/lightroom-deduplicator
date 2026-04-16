@@ -194,6 +194,37 @@ def get_catalog_paths() -> set[str]:
     return {row[0] for row in rows}
 
 
+def get_catalog_curated() -> set[str]:
+    """Return the set of file paths that show signs of curation in Lightroom.
+
+    A file is considered curated if any of:
+      - rating > 0 (starred)
+      - caption is non-empty
+      - creator is non-empty
+    """
+    p = Path(get_catalog_path()).expanduser().resolve()
+    if not p.exists():
+        return set()
+    conn = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
+    try:
+        rows = conn.execute("""
+            SELECT rf.absolutePath || f.pathFromRoot || lf.baseName || '.' || lf.extension
+            FROM AgLibraryFile lf
+            JOIN AgLibraryFolder f ON lf.folder = f.id_local
+            JOIN AgLibraryRootFolder rf ON f.rootFolder = rf.id_local
+            JOIN Adobe_images i ON i.rootFile = lf.id_local
+            LEFT JOIN AgLibraryIPTC iptc ON iptc.image = i.id_local
+            LEFT JOIN AgHarvestedIptcMetadata him ON him.image = i.id_local
+            LEFT JOIN AgInternedIptcCreator creator ON creator.id_local = him.creatorRef
+            WHERE COALESCE(i.rating, 0) > 0
+               OR COALESCE(iptc.caption, '') != ''
+               OR COALESCE(creator.value, '') != ''
+        """).fetchall()
+    finally:
+        conn.close()
+    return {row[0] for row in rows}
+
+
 def write_import_paths(paths: list[str]) -> None:
     """Write paths that need to be imported into Lightroom."""
     if not paths:

@@ -19,9 +19,10 @@ When multiple files are candidates for deletion, each script picks the **keeper*
 
 **Strict deduplicator** (bit-identical groups):
 1. In the Lightroom catalog (preferred over not-in-catalog)
-2. Non-duplicate-pattern filename (`IMG_1234.JPG` over `IMG_1234-2.JPG`)
-3. Descriptive filename (`Screenshot …`, `Screen Recording …`) over generic names
-4. Oldest creation date (earliest imported/created file wins the tie)
+2. Curated in Lightroom (starred, captioned, or has a creator set)
+3. Non-duplicate-pattern filename (`IMG_1234.JPG` over `IMG_1234-2.JPG`)
+4. Descriptive filename (`Screenshot …`, `Screen Recording …`) over generic names
+5. Oldest creation date (earliest imported/created file wins the tie)
 
 **Derivative deduplicator** (same EXIF timestamp + camera model):
 1. Best format tier: RAW (.CR3, .DNG, …) > Lossless (.TIFF, .PNG) > HEIC > JPEG
